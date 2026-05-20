@@ -15,15 +15,11 @@ export default function Home() {
   const [newgrp, setnewgrp] = useState(""); 
 
   useEffect(() => {
-    // 🚀 FIXES DUPLICATION: Listens to incoming server reflections exclusively
-
-    // Triggered when a new message arrives from the server
-
     function receiveMessageEvent(envelope) {
       newactivecht((currentRoom) => {
         if (envelope.grp === currentRoom) {
           newmsgs((prev) => {
-            // Check by content and timestamp to prevent any network double-firing
+            // Prevent duplication by checking identity signatures
             const isDuplicate = prev.some(m => m.timestamp === envelope.timestamp && m.body === envelope.body && m.sender === envelope.sender);
             if (isDuplicate) return prev;
             return prev.concat(envelope);
@@ -102,8 +98,7 @@ export default function Home() {
     }
   }
 
-  // 🚀 FIXES DUPLICATION: Removed local array appending logic completely
- function sndmsg(eventItem) {
+  function sndmsg(eventItem) {
     eventItem.preventDefault();
     if (!draft.trim()) return; 
 
@@ -114,10 +109,11 @@ export default function Home() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     };
 
-    // 🚀 SEND DIRECTLY TO SERVER ONLY: Let the server bounce it back to you cleanly
+    // Let the server push the data down dynamically to maintain synchronization
     socket.emit("sendmsg", structuralEnvelope); 
     newdraft(""); 
   }
+
   if (!isLoggedIn) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-zinc-900 text-white">
