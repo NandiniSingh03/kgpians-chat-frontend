@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 
-// Connect to our live Node.js backend server running on Render
+// Connect to your live Node.js backend server running on Render
 const socket = io("https://kgpians-chat-backend.onrender.com");
 
 export default function Home() {
@@ -21,7 +21,7 @@ export default function Home() {
     
     // Triggered when a new message arrives from the server
     function receiveMessageEvent(envelope) {
-      // Fixes JavaScript Closure trap: Always checks against the absolute latest active channel view state
+      // FIXES CLOSURE BUG: Functional update guarantees comparison against the absolute current room state
       newactivecht((currentRoom) => {
         if (envelope.grp === currentRoom) {
           newmsgs((prev) => prev.concat(envelope)); 
@@ -56,7 +56,7 @@ export default function Home() {
       });
     }
 
-    // Turn on the internet socket listeners for these 4 events
+    // Turn on the internet socket listeners
     socket.on("receivemsg", receiveMessageEvent);
     socket.on("history", historyLoadEvent);
     socket.on("grpcreated", groupCreatedEvent);
@@ -67,7 +67,7 @@ export default function Home() {
       socket.emit("joingrp", activecht);
     }
 
-    // Cleanup function: Turns off listeners when dependencies cycle to prevent duplicates
+    // Cleanup function: Turns off listeners when switching rooms to avoid duplicates
     return function cleanup() {
       socket.off("receivemsg", receiveMessageEvent);
       socket.off("history", historyLoadEvent);
@@ -91,7 +91,7 @@ export default function Home() {
     const cleanTitle = newgrp.trim(); 
     
     if (cleanTitle && !cht.includes(cleanTitle)) {
-      // Broadcast globally to everyone on the server first
+      // Broadcast globally to everyone on the server
       socket.emit("create_room", cleanTitle); 
       newcht(cht.concat(cleanTitle)); 
       newmsgs([]); // Clear logs for the fresh channel
@@ -126,6 +126,7 @@ export default function Home() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     };
 
+    // Emit to server (server will handle adding it to history and broadcasting)
     socket.emit("sendmsg", structuralEnvelope); 
     newdraft(""); 
   }
@@ -169,7 +170,7 @@ export default function Home() {
               <div
                 key={room}
                 onClick={() => {
-                  newmsgs([]); // Fixes Channel Bleeding: Wipes old logs on click before loading history
+                  newmsgs([]); // FIXES CHANNEL BLEEDING: Instantly wipes local array screen state before loading next room history
                   newactivecht(room);
                 }} 
                 className={`group flex items-center justify-between px-3 py-2 rounded-md transition text-sm font-medium cursor-pointer ${
