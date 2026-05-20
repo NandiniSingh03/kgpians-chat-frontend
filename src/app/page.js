@@ -16,13 +16,16 @@ export default function Home() {
 
   useEffect(() => {
     // 🚀 FIXES DUPLICATION: Listens to incoming server reflections exclusively
+
+    // Triggered when a new message arrives from the server
+
     function receiveMessageEvent(envelope) {
       newactivecht((currentRoom) => {
         if (envelope.grp === currentRoom) {
           newmsgs((prev) => {
-            // Prevent duplicate insertion if the message id or structural reference matches
-            const isDuplicate = prev.some(m => m.timestamp === envelope.timestamp && m.body === envelope.body && m.sender === envelope.sender);
-            if (isDuplicate) return prev;
+            // 🚀 ID DEDUPLICATION: Check if a message with this unique ID already exists on screen
+            const isDuplicate = prev.some((m) => m.id === envelope.id);
+            if (isDuplicate) return prev; // Drop it if we already displayed it locally
             return prev.concat(envelope);
           }); 
         }
@@ -100,17 +103,23 @@ export default function Home() {
   }
 
   // 🚀 FIXES DUPLICATION: Removed local array appending logic completely
-  function sndmsg(eventItem) {
+ function sndmsg(eventItem) {
     eventItem.preventDefault();
     if (!draft.trim()) return; 
 
+    // Create a single, synchronized envelope payload
     const structuralEnvelope = {
+      id: crypto.randomUUID(), // 🚀 GENERATE UNIQUE ID: Perfectly flags this exact message bubble
       grp: activecht, 
       sender: username, 
       body: draft, 
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     };
 
+    // 1. Display it locally on our screen immediately so it feels fast
+    newmsgs((prev) => prev.concat(structuralEnvelope));
+
+    // 2. Transmit it globally to everyone else via the backend
     socket.emit("sendmsg", structuralEnvelope); 
     newdraft(""); 
   }
