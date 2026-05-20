@@ -13,13 +13,15 @@ export default function Home() {
   const [username, setUsername] = useState(""); 
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [newgrp, setnewgrp] = useState(""); 
+  
+  // 🚀 MOBILE RESPONSIVE STATE: Tracks whether the sidebar drawer is open on mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     function receiveMessageEvent(envelope) {
       newactivecht((currentRoom) => {
         if (envelope.grp === currentRoom) {
           newmsgs((prev) => {
-            // Prevent duplication by checking identity signatures
             const isDuplicate = prev.some(m => m.timestamp === envelope.timestamp && m.body === envelope.body && m.sender === envelope.sender);
             if (isDuplicate) return prev;
             return prev.concat(envelope);
@@ -80,6 +82,7 @@ export default function Home() {
       newmsgs([]); 
       newactivecht(cleanTitle); 
       setnewgrp(""); 
+      setIsSidebarOpen(false); // Close sidebar drawer on mobile after creating a channel
     }
   }
 
@@ -109,15 +112,14 @@ export default function Home() {
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     };
 
-    // Let the server push the data down dynamically to maintain synchronization
     socket.emit("sendmsg", structuralEnvelope); 
     newdraft(""); 
   }
 
   if (!isLoggedIn) {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-zinc-900 text-white">
-        <form onSubmit={login} className="bg-zinc-950 p-8 rounded-lg border border-zinc-800 space-y-4 w-80">
+      <div className="flex h-screen w-screen items-center justify-center bg-zinc-900 text-white px-4">
+        <form onSubmit={login} className="bg-zinc-950 p-6 md:p-8 rounded-lg border border-zinc-800 space-y-4 w-full max-w-sm">
           <h2 className="text-xl font-bold text-teal-400 text-center">Enter Chat Nickname</h2>
           <input
             type="text"
@@ -136,11 +138,25 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen w-screen bg-zinc-900 text-white font-sans overflow-hidden">
-      <div className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col">
-        <div className="p-4 border-b border-zinc-800 font-bold text-xl tracking-wide text-teal-400 bg-teal-950/20">
-          KGPIANS-CHAT
+    <div className="flex h-screen w-screen bg-zinc-900 text-white font-sans overflow-hidden relative">
+      
+      {/* 🚀 RESPONSIVE SIDEBAR: Overlay drawer on mobile, static panel on desktop */}
+      <div className={`
+        fixed inset-y-0 left-0 z-40 w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col transform transition-transform duration-200 ease-in-out
+        md:relative md:transform-none
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
+      `}>
+        <div className="p-4 border-b border-zinc-800 flex items-center justify-between bg-teal-950/20">
+          <span className="font-bold text-xl tracking-wide text-teal-400">KGPIANS-CHAT</span>
+          {/* Close button inside sidebar on mobile view */}
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="md:hidden text-zinc-400 hover:text-white text-lg p-1"
+          >
+            ✕
+          </button>
         </div>
+        
         <div className="flex-1 p-3 overflow-y-auto space-y-1">
           <p className="text-xs font-semibold text-zinc-500 uppercase px-2 mb-2">Channels</p>
           {cht.map(function (room) {
@@ -150,6 +166,7 @@ export default function Home() {
                 onClick={() => {
                   newmsgs([]); 
                   newactivecht(room);
+                  setIsSidebarOpen(false); // Close sidebar drawer on mobile tap
                 }} 
                 className={`group flex items-center justify-between px-3 py-2 rounded-md transition text-sm font-medium cursor-pointer ${
                   activecht === room ? "bg-teal-900/50 text-teal-200 border-l-2 border-teal-500" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"
@@ -168,6 +185,7 @@ export default function Home() {
             );
           })}
         </div>
+        
         <form onSubmit={Creategrp} className="p-3 border-t border-zinc-800 space-y-2">
           <input
             type="text"
@@ -180,27 +198,48 @@ export default function Home() {
             + Add Channel
           </button>
         </form>
+        
         <div className="p-3 border-t border-zinc-800 text-xs text-zinc-500">
           Identity: <span className="text-zinc-300 font-semibold">{username}</span>
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col bg-teal-950/20">
-        <div className="h-16 flex items-center px-6 bg-teal-700 shadow-sm border-b border-teal-800">
-          <h2 className="font-bold text-lg text-white"># {activecht}</h2>
+      {/* BACKGROUND BLUR OVERLAY when mobile sidebar is active */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+        />
+      )}
+
+      {/* MAIN CHAT DISPLAY PANEL */}
+      <div className="flex-1 flex flex-col bg-teal-950/20 h-full w-full min-w-0">
+        
+        {/* RESPONSIVE HEADER BAR */}
+        <div className="h-16 flex items-center px-4 md:px-6 bg-teal-700 shadow-sm border-b border-teal-800 shrink-0">
+          {/* Mobile hamburger toggle button */}
+          <button 
+            onClick={() => setIsSidebarOpen(true)}
+            className="md:hidden mr-3 text-white p-1 text-xl hover:bg-teal-800 rounded transition"
+          >
+            ☰
+          </button>
+          <h2 className="font-bold text-lg text-white truncate"># {activecht}</h2>
         </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col">
+
+        {/* MESSAGES LOG CONTAINER */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 flex flex-col min-h-0">
           {msgs.length === 0 ? (
             <p className="text-sm text-zinc-500 text-center mt-4">nothing here yet. type something to start talking!</p>
           ) : (
             msgs.map(function (msg, structuralIndex) {
               const belongsToMe = msg.sender === username;
               return (
-                <div key={structuralIndex} className={`flex flex-col max-w-[70%] ${belongsToMe ? "self-end items-end" : "self-start items-start"}`}>
+                <div key={structuralIndex} className={`flex flex-col max-w-[85%] md:max-w-[70%] ${belongsToMe ? "self-end items-end" : "self-start items-start"}`}>
                   <span className="text-xs text-zinc-400 mb-1 px-1">
                     {belongsToMe ? "You" : msg.sender} • {msg.timestamp}
                   </span>
-                  <div className={`rounded-2xl px-4 py-2 text-sm shadow-md leading-relaxed ${belongsToMe ? "bg-cyan-500 text-zinc-950 rounded-tr-none font-medium" : "bg-zinc-100 text-zinc-900 rounded-tl-none"}`}>
+                  <div className={`rounded-2xl px-4 py-2 text-sm shadow-md leading-relaxed break-words w-full ${belongsToMe ? "bg-cyan-500 text-zinc-950 rounded-tr-none font-medium" : "bg-zinc-100 text-zinc-900 rounded-tl-none"}`}>
                     {msg.body}
                   </div>
                 </div>
@@ -208,20 +247,23 @@ export default function Home() {
             })
           )}
         </div>
-        <form onSubmit={sndmsg} className="p-4 bg-zinc-950/30 border-t border-zinc-800">
+
+        {/* INPUT LAYOUT BAR - Fixed constraint sizing for absolute visibility on mobile viewports */}
+        <form onSubmit={sndmsg} className="p-4 bg-zinc-950/30 border-t border-zinc-800 shrink-0">
           <div className="flex items-center space-x-2 bg-zinc-800 rounded-lg px-4 py-2.5 focus-within:ring-2 focus-within:ring-teal-500">
             <input
               type="text"
               value={draft}
               onChange={(e) => newdraft(e.target.value)}
               placeholder={`Message #${activecht}`}
-              className="bg-transparent flex-1 outline-none text-zinc-200 text-sm placeholder-zinc-500"
+              className="bg-transparent flex-1 outline-none text-zinc-200 text-sm placeholder-zinc-500 min-w-0"
             />
-            <button type="submit" className="text-teal-400 hover:text-teal-300 font-semibold text-sm transition px-2">
+            <button type="submit" className="text-teal-400 hover:text-teal-300 font-semibold text-sm transition px-2 shrink-0">
               Send
             </button>
           </div>
         </form>
+
       </div>
     </div>
   );
