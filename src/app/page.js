@@ -1,13 +1,11 @@
-"use client"; // Tells Next.js that this page is interactive
+"use client"; 
 
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 
-// Connect to your live Node.js backend server running on Render
 const socket = io("https://kgpians-chat-backend.onrender.com");
 
 export default function Home() {
-  // --- STATE REGISTRIES ---
   const [cht, newcht] = useState(["1st Years", "2nd Years", "3rd Years", "4th Years"]); 
   const [activecht, newactivecht] = useState("1st Years"); 
   const [msgs, newmsgs] = useState([]); 
@@ -16,26 +14,26 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [newgrp, setnewgrp] = useState(""); 
 
-  // --- ASYNCHRONOUS NETWORK CHANNEL WATCHERS ---
   useEffect(() => {
-    
-    // Triggered when a new message arrives from the server
+    // 🚀 FIXES DUPLICATION: Listens to incoming server reflections exclusively
     function receiveMessageEvent(envelope) {
-      // FIXES CLOSURE BUG: Functional update guarantees comparison against the absolute current room state
       newactivecht((currentRoom) => {
         if (envelope.grp === currentRoom) {
-          newmsgs((prev) => prev.concat(envelope)); 
+          newmsgs((prev) => {
+            // Prevent duplicate insertion if the message id or structural reference matches
+            const isDuplicate = prev.some(m => m.timestamp === envelope.timestamp && m.body === envelope.body && m.sender === envelope.sender);
+            if (isDuplicate) return prev;
+            return prev.concat(envelope);
+          }); 
         }
         return currentRoom;
       });
     }
 
-    // Triggered right when entering a room to load all its past chat messages
     function historyLoadEvent(archiveLog) {
       newmsgs(archiveLog || []); 
     }
 
-    // Triggered when someone else creates a new channel globally
     function groupCreatedEvent(freshRoom) {
       newcht((existingSpaces) => {
         if (!existingSpaces.includes(freshRoom)) {
@@ -45,29 +43,20 @@ export default function Home() {
       });
     }
 
-    // Triggered when someone deletes a group globally
     function groupDeletedEvent(purgedSpace) {
       newcht((existingSpaces) => existingSpaces.filter((room) => room !== purgedSpace));
-      newactivecht((currentSpaceView) => {
-        if (currentSpaceView === purgedSpace) {
-          return "1st Years";
-        }
-        return currentSpaceView;
-      });
+      newactivecht((currentSpaceView) => currentSpaceView === purgedSpace ? "1st Years" : currentSpaceView);
     }
 
-    // Turn on the internet socket listeners
     socket.on("receivemsg", receiveMessageEvent);
     socket.on("history", historyLoadEvent);
     socket.on("grpcreated", groupCreatedEvent);
     socket.on("grpdeleted", groupDeletedEvent);
 
-    // If logged in, tell the backend to connect us to our current room channel
     if (isLoggedIn) {
       socket.emit("joingrp", activecht);
     }
 
-    // Cleanup function: Turns off listeners when switching rooms to avoid duplicates
     return function cleanup() {
       socket.off("receivemsg", receiveMessageEvent);
       socket.off("history", historyLoadEvent);
@@ -76,25 +65,20 @@ export default function Home() {
     };
   }, [activecht, isLoggedIn]); 
 
-  // --- FUNCTION ROUTINES (User Actions) ---
-
   function login(eventItem) {
     eventItem.preventDefault(); 
     if (username.trim()) {
       setIsLoggedIn(true); 
-      socket.emit("joingrp", activecht); 
     }
   }
 
   function Creategrp(eventItem) {
     eventItem.preventDefault();
     const cleanTitle = newgrp.trim(); 
-    
     if (cleanTitle && !cht.includes(cleanTitle)) {
-      // Broadcast globally to everyone on the server
       socket.emit("create_room", cleanTitle); 
-      newcht(cht.concat(cleanTitle)); 
-      newmsgs([]); // Clear logs for the fresh channel
+      newcht((prev) => prev.concat(cleanTitle));
+      newmsgs([]); 
       newactivecht(cleanTitle); 
       setnewgrp(""); 
     }
@@ -115,6 +99,7 @@ export default function Home() {
     }
   }
 
+  // 🚀 FIXES DUPLICATION: Removed local array appending logic completely
   function sndmsg(eventItem) {
     eventItem.preventDefault();
     if (!draft.trim()) return; 
@@ -123,15 +108,13 @@ export default function Home() {
       grp: activecht, 
       sender: username, 
       body: draft, 
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) 
     };
 
-    // Emit to server (server will handle adding it to history and broadcasting)
     socket.emit("sendmsg", structuralEnvelope); 
     newdraft(""); 
   }
 
-  // --- RENDERING 1: NICKNAME LOGIN INTERFACE ---
   if (!isLoggedIn) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-zinc-900 text-white">
@@ -153,16 +136,12 @@ export default function Home() {
     );
   }
 
-  // --- RENDERING 2: MAIN DISCORD-STYLE WORKSPACE ---
   return (
     <div className="flex h-screen w-screen bg-zinc-900 text-white font-sans overflow-hidden">
-      
-      {/* SIDEBAR PANEL */}
       <div className="w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col">
         <div className="p-4 border-b border-zinc-800 font-bold text-xl tracking-wide text-teal-400 bg-teal-950/20">
           KGPIANS-CHAT
         </div>
-        
         <div className="flex-1 p-3 overflow-y-auto space-y-1">
           <p className="text-xs font-semibold text-zinc-500 uppercase px-2 mb-2">Channels</p>
           {cht.map(function (room) {
@@ -170,7 +149,7 @@ export default function Home() {
               <div
                 key={room}
                 onClick={() => {
-                  newmsgs([]); // FIXES CHANNEL BLEEDING: Instantly wipes local array screen state before loading next room history
+                  newmsgs([]); 
                   newactivecht(room);
                 }} 
                 className={`group flex items-center justify-between px-3 py-2 rounded-md transition text-sm font-medium cursor-pointer ${
@@ -190,8 +169,6 @@ export default function Home() {
             );
           })}
         </div>
-
-        {/* Create Group Form */}
         <form onSubmit={Creategrp} className="p-3 border-t border-zinc-800 space-y-2">
           <input
             type="text"
@@ -204,19 +181,15 @@ export default function Home() {
             + Add Channel
           </button>
         </form>
-
         <div className="p-3 border-t border-zinc-800 text-xs text-zinc-500">
           Identity: <span className="text-zinc-300 font-semibold">{username}</span>
         </div>
       </div>
 
-      {/* CHAT DISPLAY PANEL */}
       <div className="flex-1 flex flex-col bg-teal-950/20">
-        
         <div className="h-16 flex items-center px-6 bg-teal-700 shadow-sm border-b border-teal-800">
           <h2 className="font-bold text-lg text-white"># {activecht}</h2>
         </div>
-
         <div className="flex-1 overflow-y-auto p-6 space-y-4 flex flex-col">
           {msgs.length === 0 ? (
             <p className="text-sm text-zinc-500 text-center mt-4">nothing here yet. type something to start talking!</p>
@@ -236,8 +209,6 @@ export default function Home() {
             })
           )}
         </div>
-
-        {/* Input Form */}
         <form onSubmit={sndmsg} className="p-4 bg-zinc-950/30 border-t border-zinc-800">
           <div className="flex items-center space-x-2 bg-zinc-800 rounded-lg px-4 py-2.5 focus-within:ring-2 focus-within:ring-teal-500">
             <input
@@ -252,7 +223,6 @@ export default function Home() {
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );
