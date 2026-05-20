@@ -118,7 +118,6 @@ export default function Home() {
     socket.emit("sendmsg", structuralEnvelope); 
     newdraft(""); 
   }
-
   if (!isLoggedIn) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-zinc-900 text-white">
