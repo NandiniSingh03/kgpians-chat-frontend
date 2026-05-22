@@ -14,7 +14,7 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false); 
   const [newgrp, setnewgrp] = useState(""); 
   
-  // 🚀 MOBILE RESPONSIVE STATE: Tracks whether the sidebar drawer is open on mobile
+  // MOBILE RESPONSIVE STATE: Tracks whether the sidebar drawer is open on mobile
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export default function Home() {
   function delgrp(targetKey, eventItem) {
     eventItem.stopPropagation(); 
     if (targetKey === "1st Years") {
-      alert("bro, you cannot delete the main 1st Years group!");
+      alert("you cannot delete the main 1st Years group!");
       return;
     }
     if (confirm(`you sure you want to delete "# ${targetKey}"?`)) {
@@ -140,7 +140,7 @@ export default function Home() {
   return (
     <div className="flex h-screen w-screen bg-zinc-900 text-white font-sans overflow-hidden relative">
       
-      {/* 🚀 RESPONSIVE SIDEBAR: Overlay drawer on mobile, static panel on desktop */}
+      {/* RESPONSIVE SIDEBAR: Overlay drawer on mobile, static panel on desktop */}
       <div className={`
         fixed inset-y-0 left-0 z-40 w-64 bg-zinc-950 border-r border-zinc-800 flex flex-col transform transition-transform duration-200 ease-in-out
         md:relative md:transform-none
